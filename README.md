@@ -10,6 +10,10 @@ scanner + label printer setup later with **zero code changes**.
 ![Catalog search](docs/catalog.png)
 ![Check in / out](docs/checkout.png)
 
+**On a Mac?** A ready-made double-clickable app is available separately
+(`The Book Nook.app.zip`) — see [Desktop app (macOS)](#desktop-app-macos--a-real-icon-in-applications-and-the-dock)
+below to install it directly into Applications with its own Dock icon.
+
 ## Features
 
 - **Search** the catalog by title, author, genre, or barcode/ISBN — one search
@@ -104,8 +108,9 @@ A barcode is generated automatically for every new book.
 
 **Checking a book out:** Check In/Out tab → type or scan the barcode →
 Enter. If a scanner isn't hooked up yet, click "Can't scan? Search by
-title/author" to find the book instead. Enter the patron's name and click
-Check Out.
+title/author" to find the book instead — type to filter, then either
+**double-click** the book to select it immediately, or select it and click
+**Select**. Enter the patron's name and click Check Out.
 
 **Checking a book back in:** same barcode field — every currently checked-out
 copy of that book is listed with its own **Check In** button, so you can
@@ -246,20 +251,47 @@ with just a shelf code and no barcode? Uncheck everything except Shelf
 Location. Want the full picture for a new shipment of books? Check them
 all. At least one item must stay checked.
 
-## Desktop app (macOS) — no more typing commands
+## Desktop app (macOS) — a real icon in Applications and the Dock
 
-Once dependencies are installed once (step 3 above), you don't need to open
-Terminal again. There are two ways to launch it with a click instead:
+**Option A — use the ready-made `The Book Nook.app` (recommended, easiest):**
+A finished app bundle is included separately (`The Book Nook.app.zip`) —
+unzip it and drag **The Book Nook.app** into your **Applications** folder
+(or anywhere you like).
 
-**Option A — the included launcher (works immediately, easiest):**
+- **First launch only:** macOS will refuse to open it since it's not from
+  an identified developer — right-click (or Control-click) the app, choose
+  **Open**, then confirm in the dialog that appears. After that, a normal
+  double-click always works.
+- It shows up with its own icon in Applications, Launchpad, and the Dock —
+  drag it onto the Dock to pin it there, just like any other app.
+- **No Terminal window** — it launches directly, the same as a native app.
+- The first launch takes a little longer (~30–60 seconds) while it quietly
+  installs its dependencies in the background; every launch after that is
+  fast.
+- **It still needs Python 3 installed** (see step 1 near the top of this
+  README) — this app bundle is a lightweight wrapper around your system's
+  Python, not a fully self-contained build. If Python isn't found, or is
+  missing tkinter, it tells you so in a normal macOS alert dialog rather
+  than failing silently.
+- If something does go wrong, check the log at
+  `~/Library/Logs/The Book Nook/launch.log` — the alert dialog tells you
+  this same path.
+- Your data (catalog, settings) lives at
+  `~/Library/Application Support/The Book Nook/` — back up that folder
+  the same way you'd have backed up the old `data/library.db`. If you were
+  using an earlier folder-based copy of this app, its existing catalog is
+  copied there automatically the first time you launch.
+
+**Option B — the included launcher script (if you'd rather run from the
+project folder as-is):**
 Double-click **`Launch The Book Nook.command`** in this folder. The first
 time, macOS will refuse to open it because it's not from an identified
 developer — right-click it, choose **Open**, then confirm. After that, a
 plain double-click works every time. It briefly opens a Terminal window (so
 you can see any error messages) and closes it when you quit the app.
 
-**Option B — a real Dock/Desktop icon with no Terminal window at all
-(~2 minutes to set up, using Automator, which is already on your Mac):**
+**Option C — build your own Dock icon with Automator (~2 minutes, if you'd
+rather not use the pre-built .app):**
 1. Open **Automator** (Spotlight → type "Automator").
 2. **File → New**, choose **Application**, click Choose.
 3. In the search box on the left, type "Run Shell Script" and drag it into
@@ -277,15 +309,10 @@ you can see any error messages) and closes it when you quit the app.
    Finder, press **⌘I** to get info, click the small icon in the top-left
    of that info window, and **⌘V** to paste.
 
-Now double-clicking that app launches The Book Nook directly — no
-Terminal window, just like any other Mac app. You can drag it to the Dock.
-
-*(There's also a more involved option — bundling everything into one
-fully self-contained `.app` with `py2app`, so it doesn't even need Python
-pre-installed on the machine running it. See `packaging/setup_py2app.py`
-if you want to go that route; it needs to be built on a Mac and may need
-some troubleshooting, so Option B above is the more reliable path for
-most people.)*
+*(Want a version that doesn't need Python pre-installed at all? See
+`packaging/setup_py2app.py` for a `py2app`-based build — it must be built
+on a Mac and can need some troubleshooting, so Option A above is the more
+reliable path for most people.)*
 
 ## Desktop app (Windows) — no more typing commands
 
@@ -361,6 +388,38 @@ the_book_nook/
 
 ## Troubleshooting
 
+- **`The Book Nook.app` shows an alert and won't open** — the alert tells
+  you exactly what's wrong (usually: Python isn't installed, or is missing
+  tkinter). Install Python from python.org and try again. For anything
+  else, check `~/Library/Logs/The Book Nook/launch.log`, which the alert
+  also points to.
+- **The Dock/Finder shows a generic Python icon instead of the custom
+  icon** — almost always a macOS icon-caching quirk, not a broken app
+  bundle. Try these, roughly in order of effort:
+  1. Make sure the app has actually been **moved into `/Applications`**,
+     not just run from `Downloads` — unsigned apps launched straight from
+     Downloads can run from a hidden, randomized copy (Gatekeeper's "app
+     translocation"), which can also confuse icon display.
+  2. Quit the app, then in Terminal run `killall Finder && killall Dock`
+     — this safely restarts both (no data is affected) and often clears a
+     stale icon immediately.
+  3. Still stuck? `sudo rm -rf /Library/Caches/com.apple.iconservices.store`
+     then `killall Dock` — a more thorough icon-cache reset.
+  4. As a last resort, a full restart always clears every icon cache.
+
+  The app also sets its icon at the window level (not just via the bundle),
+  as a second safeguard — mainly relevant on macOS, where a script-launched
+  Python process can otherwise default to Python's own icon rather than the
+  wrapping app's.
+- **Log shows `incompatible architecture (have 'arm64', need 'x86_64')`**
+  — this is an Apple Silicon (M1/M2/M3) quirk: the app was launched under
+  Rosetta translation, so it tried to load native arm64 libraries (like
+  Pillow) from an x86_64 process. The app already guards against this two
+  ways (an `Info.plist` setting plus a self-correcting check in the
+  launcher), so a normal double-click should just work — if you still hit
+  this, try one plain double-click first (not "Open" from a right-click),
+  since the very first right-click-Open on an unsigned app can occasionally
+  launch translated before macOS remembers your Open Anyway choice.
 - **`ModuleNotFoundError: No module named 'tkinter'`** — install Tk for your
   OS (see step 2 above).
 - **CSV import skips rows** — the import screen shows exactly which rows

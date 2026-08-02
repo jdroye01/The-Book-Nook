@@ -129,7 +129,14 @@ class CheckoutTab(tb.Frame):
 
         table_frame = tb.Frame(dlg, padding=(10, 0, 10, 10))
         table_frame.pack(fill="both", expand=True)
-        table = BookTable(table_frame)
+
+        def choose(book=None):
+            book = book or table.selected_book()
+            if book:
+                self._show_book(book)
+                dlg.destroy()
+
+        table = BookTable(table_frame, on_double_click=choose)
         table.pack(fill="both", expand=True)
 
         def do_search(*a):
@@ -139,15 +146,11 @@ class CheckoutTab(tb.Frame):
         q.trace_add("write", do_search)
         do_search()
 
-        def choose():
-            book = table.selected_book()
-            if book:
-                self._show_book(book)
-                dlg.destroy()
-
         entry.bind("<Return>", lambda e: choose())
         btns = tb.Frame(dlg, padding=10)
         btns.pack(fill="x")
+        tb.Label(btns, text="Double-click a book to select it.", font=("Helvetica", 8),
+                 foreground="#868e96").pack(side="left")
         tb.Button(btns, text="Select", command=choose, bootstyle="primary").pack(side="right")
 
     # ------------------------------------------------------------------

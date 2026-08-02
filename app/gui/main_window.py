@@ -1,8 +1,10 @@
+import os
 import threading
 import tkinter as tk
 from tkinter import messagebox
 import ttkbootstrap as tb
 from ttkbootstrap.constants import *
+from PIL import Image, ImageTk
 
 from app import config, reminder_engine
 from app.database import LibraryDB
@@ -38,6 +40,7 @@ class MainWindow(tb.Window):
         self.db = LibraryDB()
         self.settings = Settings()
         style_modern_treeview(self.style)
+        self._set_app_icon()
 
         self._build_menu()
 
@@ -83,6 +86,28 @@ class MainWindow(tb.Window):
             self.sidebar.add_item(key, icon, label)
 
         self.after(STARTUP_CHECK_DELAY_MS, self._schedule_auto_reminder_checks)
+
+    def _set_app_icon(self):
+        """
+        Sets the window icon from the bundled PNG assets. This matters most
+        on macOS: when the app is launched via a wrapper script (as the
+        .app bundle does), the running Python process can otherwise show
+        Python's own generic icon in the Dock instead of this app's icon.
+        Setting it here at the Tk level is the standard pure-Python fix
+        that doesn't need any extra platform-specific dependencies.
+        """
+        assets_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets")
+        try:
+            images = []
+            for name in ("icon_512.png", "icon_256.png"):
+                path = os.path.join(assets_dir, name)
+                if os.path.exists(path):
+                    images.append(ImageTk.PhotoImage(Image.open(path)))
+            if images:
+                self.iconphoto(True, *images)
+                self._icon_images = images  # keep a reference so Tk doesn't garbage-collect it
+        except Exception:
+            pass  # a missing/unreadable icon shouldn't ever prevent the app from starting
 
     def _build_menu(self):
         menubar = tk.Menu(self)

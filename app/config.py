@@ -3,14 +3,50 @@ Central configuration for the library system.
 Edit these values to tune behavior without digging through the codebase.
 """
 import os
+import shutil
+import sys
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = os.path.join(BASE_DIR, "data")
-EXPORTS_DIR = os.path.join(BASE_DIR, "exports")
+APP_TITLE = "The Book Nook"
+APP_MOTTO = "Where every book finds its reader"
+
+
+def _default_data_root():
+    """
+    Where the database, settings, and exports live -- the OS-standard
+    per-user data location, not a folder next to the app itself. This
+    matters for a real installed .app: /Applications isn't meant to be
+    writable, and reinstalling/updating the app shouldn't touch user data.
+    """
+    if sys.platform == "darwin":
+        return os.path.join(os.path.expanduser("~/Library/Application Support"), APP_TITLE)
+    elif sys.platform.startswith("win"):
+        base = os.environ.get("APPDATA") or os.path.expanduser("~")
+        return os.path.join(base, APP_TITLE)
+    else:
+        base = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+        return os.path.join(base, APP_TITLE)
+
+
+DATA_ROOT = _default_data_root()
+DATA_DIR = os.path.join(DATA_ROOT, "data")
+EXPORTS_DIR = os.path.join(DATA_ROOT, "exports")
 DB_PATH = os.path.join(DATA_DIR, "library.db")
 
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(EXPORTS_DIR, exist_ok=True)
+
+# One-time migration: earlier versions stored data in a "data" folder right
+# next to main.py. If that exists and nothing has been created yet at the
+# new location, copy it over automatically so existing catalogs aren't lost.
+_legacy_data_dir = os.path.join(BASE_DIR, "data")
+_legacy_db = os.path.join(_legacy_data_dir, "library.db")
+_new_db = os.path.join(DATA_DIR, "library.db")
+if os.path.exists(_legacy_db) and not os.path.exists(_new_db):
+    for _fname in ("library.db", "settings.json"):
+        _src = os.path.join(_legacy_data_dir, _fname)
+        if os.path.exists(_src):
+            shutil.copy2(_src, os.path.join(DATA_DIR, _fname))
 
 # --- Circulation rules ---
 DEFAULT_LOAN_DAYS = 14          # default checkout period
@@ -40,5 +76,3 @@ LABEL_SHEET = {
 
 # --- Appearance ---
 THEME = "flatly"   # ttkbootstrap theme name; try "journal", "cosmo", "darkly" etc.
-APP_TITLE = "The Book Nook"
-APP_MOTTO = "Where every book finds its reader"
