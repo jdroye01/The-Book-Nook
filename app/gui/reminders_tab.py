@@ -4,7 +4,7 @@ from tkinter import ttk, messagebox
 import ttkbootstrap as tb
 
 from app import config, email_utils, reminder_engine
-from app.gui.widgets import labeled_entry, Card, page_header, restripe
+from app.gui.widgets import labeled_entry, Card, page_header, restripe, make_scrollable
 
 
 class EmailTemplateDialog(tk.Toplevel):
@@ -132,7 +132,7 @@ class RemindersTab(tb.Frame):
     """
 
     def __init__(self, parent, db, settings, status_bar):
-        super().__init__(parent, padding=24)
+        super().__init__(parent)
         self.db = db
         self.settings = settings
         self.status_bar = status_bar
@@ -140,13 +140,18 @@ class RemindersTab(tb.Frame):
         self.refresh_log()
 
     def _build(self):
-        page_header(self, "✉️", "Reminders",
+        # Scrollable so the SMTP settings, schedule, and log below all stay
+        # reachable even on a smaller screen or a resized window.
+        canvas, inner = make_scrollable(self)
+        inner.configure(padding=24)
+
+        page_header(inner, "✉️", "Reminders",
                     "Sends an email to a patron's Contact address (entered at checkout) when a "
                     "book is approaching, at, or past its due date. The app must be running for "
                     "scheduled reminders to go out -- it checks automatically about once an hour "
                     "while open, or you can check on demand below.")
 
-        body = tb.Frame(self)
+        body = tb.Frame(inner)
         body.pack(fill="x", pady=(0, 14))
         body.grid_columnconfigure(0, weight=1)
         body.grid_columnconfigure(1, weight=1)
@@ -215,7 +220,7 @@ class RemindersTab(tb.Frame):
         self.last_check_label.pack(anchor="w", pady=(10, 0))
 
         # --- Log ---
-        log_card = Card(self, title="Reminder Log", icon="📜")
+        log_card = Card(inner, title="Reminder Log", icon="📜")
         log_card.pack(fill="both", expand=True)
         log_box = log_card.body
         cols = ("sent_at", "title", "patron", "due_date", "offset", "status", "to_email", "error")

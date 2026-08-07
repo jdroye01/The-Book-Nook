@@ -4,7 +4,7 @@ import ttkbootstrap as tb
 import datetime
 
 from app import config
-from app.gui.widgets import BookTable, labeled_entry, Card, page_header, badge, restripe
+from app.gui.widgets import BookTable, labeled_entry, Card, page_header, badge, restripe, NameAutocomplete, make_scrollable
 
 
 class CheckoutTab(tb.Frame):
@@ -16,7 +16,7 @@ class CheckoutTab(tb.Frame):
     """
 
     def __init__(self, parent, db, status_bar, on_activity=None):
-        super().__init__(parent, padding=24)
+        super().__init__(parent)
         self.db = db
         self.status_bar = status_bar
         self.on_activity = on_activity
@@ -26,11 +26,17 @@ class CheckoutTab(tb.Frame):
         self.refresh_active_list()
 
     def _build(self):
-        page_header(self, "🔄", "Check In / Out",
+        # Scrollable so the active-loans list, the autocomplete dropdown,
+        # and the "Currently Checked Out" table below can never push
+        # something important (like the Check Out button) out of reach.
+        canvas, inner = make_scrollable(self)
+        inner.configure(padding=24)
+
+        page_header(inner, "🔄", "Check In / Out",
                     "Scan a barcode, or search by title, to check a book in or out.")
 
         # --- Scan/search card ---
-        scan_card = Card(self, title="Scan or Enter Barcode", icon="🔍")
+        scan_card = Card(inner, title="Scan or Enter Barcode", icon="🔍")
         scan_card.pack(fill="x", pady=(0, 16))
         scan_row = scan_card.body
 
@@ -47,13 +53,13 @@ class CheckoutTab(tb.Frame):
                    command=self._open_title_search, bootstyle="link").grid(row=0, column=3, padx=(12, 0))
 
         # --- Book status / action panel ---
-        self.book_card = Card(self, title="Book", icon="📖")
+        self.book_card = Card(inner, title="Book", icon="📖")
         self.book_card.pack(fill="x", pady=(0, 16))
         self.panel = self.book_card.body
         self._render_empty_panel()
 
         # --- Active checkouts table ---
-        list_card = Card(self, title="Currently Checked Out", icon="📋")
+        list_card = Card(inner, title="Currently Checked Out", icon="📋")
         list_card.pack(fill="both", expand=True)
         list_frame = list_card.body
 
@@ -187,7 +193,15 @@ class CheckoutTab(tb.Frame):
     def _render_checkout_form(self, book):
         form = tb.Frame(self.panel)
         form.pack(fill="x", pady=(0, 16) if self.db.active_checkouts_for_book(book["id"]) else 0)
-        self.e_patron = labeled_entry(form, "Patron name *", 0, width=30)
+
+        tb.Label(form, text="Patron name *").grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
+        self.e_patron = NameAutocomplete(
+            form, lookup_fn=lambda q: self.db.patrons_matching_name_prefix(q),
+            on_select=self._on_patron_selected, width=30)
+        self.e_patron.grid(row=0, column=1, sticky="ew", pady=4)
+        # add="+" so this doesn't clobber the dropdown's own focus-out handling
+        self.e_patron.entry.bind("<FocusOut>", lambda e: self._maybe_autofill_contact(), add="+")
+
         self.e_contact = labeled_entry(form, "Contact (phone/email)", 1, width=30)
         tb.Label(form, text="Enter an email here to enable due-date reminders.",
                  font=("Helvetica", 8), foreground="#868e96").grid(row=2, column=1, sticky="w")
@@ -212,7 +226,28 @@ class CheckoutTab(tb.Frame):
         tb.Button(form, text=f"Check Out '{book['title'][:24]}'", bootstyle="success",
                    command=lambda: self._do_checkout(book)).grid(row=5, column=0, columnspan=2, sticky="ew", pady=(14, 0))
         self.e_patron.focus_set()
-        self.e_patron.bind("<Return>", lambda e: self._do_checkout(book))
+        self.e_patron.bind_return(lambda: self._do_checkout(book))
+
+    def _on_patron_selected(self, patron):
+        """Fired by the name-autocomplete dropdown when an existing patron
+        is picked -- preloads their saved contact info, if any."""
+        if patron.get("contact"):
+            self.e_contact.delete(0, tk.END)
+            self.e_contact.insert(0, patron["contact"])
+            self.status_bar.show(f"Loaded saved contact info for {patron['name']}.")
+
+    def _maybe_autofill_contact(self):
+        """Covers typing a known patron's full name without using the
+        dropdown: if what's typed exactly matches exactly one existing
+        patron and the contact field is still empty, fill it in."""
+        name = self.e_patron.get().strip()
+        if not name or self.e_contact.get().strip():
+            return
+        patron, ambiguous = self.db.find_patron_by_exact_name(name)
+        if patron and patron.get("contact"):
+            self.e_contact.delete(0, tk.END)
+            self.e_contact.insert(0, patron["contact"])
+            self.status_bar.show(f"Loaded saved contact info for {patron['name']}.")
 
     def _render_active_loans_section(self, book, active_loans):
         """

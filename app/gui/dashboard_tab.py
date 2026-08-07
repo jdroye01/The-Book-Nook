@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 import ttkbootstrap as tb
 
-from app.gui.widgets import MiniBarChart, Card, page_header
+from app.gui.widgets import MiniBarChart, Card, page_header, make_scrollable
 
 
 class StatCard(tb.Frame):
@@ -37,7 +37,7 @@ class StatCard(tb.Frame):
 
 class DashboardTab(tb.Frame):
     def __init__(self, parent, db, status_bar, navigate=None):
-        super().__init__(parent, padding=24)
+        super().__init__(parent)
         self.db = db
         self.status_bar = status_bar
         self.navigate = navigate or (lambda *a, **k: None)
@@ -45,10 +45,15 @@ class DashboardTab(tb.Frame):
         self.refresh()
 
     def _build(self):
-        page_header(self, "📊", "Dashboard", "Here's what's happening in your library today.")
+        # Scrollable so nothing (stat cards, quick actions, the log lists)
+        # can end up unreachable on a smaller screen or a resized window.
+        canvas, inner = make_scrollable(self)
+        inner.configure(padding=24)
+
+        page_header(inner, "📊", "Dashboard", "Here's what's happening in your library today.")
 
         # --- Quick actions ---
-        actions = tb.Frame(self)
+        actions = tb.Frame(inner)
         actions.pack(fill="x", pady=(0, 20))
         tb.Button(actions, text="＋ Add Book", bootstyle="success",
                   command=lambda: self.navigate("catalog", add_book=True)).pack(side="left", padx=(0, 8))
@@ -68,7 +73,7 @@ class DashboardTab(tb.Frame):
                   command=self._do_quick_search).pack(side="left", padx=(6, 0))
 
         # --- Stat cards ---
-        cards_frame = tb.Frame(self)
+        cards_frame = tb.Frame(inner)
         cards_frame.pack(anchor="w", pady=(0, 20))
         self.card_titles = StatCard(cards_frame, "Titles in catalog", "info",
                                      on_click=lambda: self.navigate("catalog"))
@@ -84,7 +89,7 @@ class DashboardTab(tb.Frame):
         self.card_overdue.pack(side="left")
 
         # --- Middle row: this week + top borrowed ---
-        mid = tb.Frame(self)
+        mid = tb.Frame(inner)
         mid.pack(fill="x", pady=(0, 20))
         mid.grid_columnconfigure(0, weight=1)
         mid.grid_columnconfigure(1, weight=1)
@@ -106,7 +111,7 @@ class DashboardTab(tb.Frame):
         self.top_chart.pack(fill="x")
 
         # --- Lower row: overdue + recent activity ---
-        lists_frame = tb.Frame(self)
+        lists_frame = tb.Frame(inner)
         lists_frame.pack(fill="both", expand=True)
         lists_frame.grid_columnconfigure(0, weight=1)
         lists_frame.grid_columnconfigure(1, weight=1)
@@ -124,7 +129,7 @@ class DashboardTab(tb.Frame):
                                          highlightthickness=0)
         self.activity_list.pack(fill="both", expand=True)
 
-        tb.Button(self, text="Refresh", command=self.refresh, bootstyle="secondary-outline").pack(anchor="e", pady=(14, 0))
+        tb.Button(inner, text="Refresh", command=self.refresh, bootstyle="secondary-outline").pack(anchor="e", pady=(14, 0))
 
     def _do_quick_search(self, event=None):
         query = self.search_var.get().strip()

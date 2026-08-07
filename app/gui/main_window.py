@@ -13,6 +13,7 @@ from app.gui.widgets import StatusBar, Sidebar, style_modern_treeview
 from app.gui.dashboard_tab import DashboardTab
 from app.gui.catalog_tab import CatalogTab
 from app.gui.checkout_tab import CheckoutTab
+from app.gui.patrons_tab import PatronsTab
 from app.gui.import_tab import ImportTab
 from app.gui.barcode_tab import BarcodeTab
 from app.gui.reminders_tab import RemindersTab
@@ -24,6 +25,7 @@ NAV_ITEMS = [
     ("dashboard", "📊", "Dashboard"),
     ("checkout", "🔄", "Check In / Out"),
     ("catalog", "📚", "Catalog"),
+    ("patrons", "👤", "Patrons"),
     ("import", "📥", "Import Books"),
     ("barcodes", "🏷️", "Barcodes"),
     ("reminders", "✉️", "Reminders"),
@@ -66,6 +68,7 @@ class MainWindow(tb.Window):
         self.checkout_tab = CheckoutTab(self.content, self.db, self.status_bar,
                                         on_activity=self._on_activity)
         self.catalog_tab = CatalogTab(self.content, self.db, self.status_bar)
+        self.patrons_tab = PatronsTab(self.content, self.db, self.status_bar)
         self.import_tab = ImportTab(self.content, self.db, self.status_bar,
                                      on_imported=self._on_catalog_changed)
         self.barcode_tab = BarcodeTab(self.content, self.db, self.settings, self.status_bar)
@@ -75,6 +78,7 @@ class MainWindow(tb.Window):
             "dashboard": self.dashboard_tab,
             "checkout": self.checkout_tab,
             "catalog": self.catalog_tab,
+            "patrons": self.patrons_tab,
             "import": self.import_tab,
             "barcodes": self.barcode_tab,
             "reminders": self.reminders_tab,
@@ -149,6 +153,8 @@ class MainWindow(tb.Window):
             self.dashboard_tab.refresh()
         elif key == "catalog":
             self.catalog_tab.refresh()
+        elif key == "patrons":
+            self.patrons_tab.refresh()
         elif key == "checkout":
             self.checkout_tab.refresh_active_list()
         elif key == "barcodes":
@@ -159,6 +165,7 @@ class MainWindow(tb.Window):
     def _on_activity(self):
         self.dashboard_tab.refresh()
         self.catalog_tab.refresh()
+        self.patrons_tab.refresh()
 
     def _on_catalog_changed(self):
         self.dashboard_tab.refresh()

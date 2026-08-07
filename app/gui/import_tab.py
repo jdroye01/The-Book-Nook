@@ -4,7 +4,7 @@ from tkinter import ttk, filedialog, messagebox
 import ttkbootstrap as tb
 
 from app import importer
-from app.gui.widgets import Card, page_header
+from app.gui.widgets import Card, page_header, make_scrollable
 
 
 CANONICAL_FIELDS = [
@@ -23,7 +23,7 @@ CANONICAL_FIELDS = [
 
 class ImportTab(tb.Frame):
     def __init__(self, parent, db, status_bar, on_imported=None):
-        super().__init__(parent, padding=24)
+        super().__init__(parent)
         self.db = db
         self.status_bar = status_bar
         self.on_imported = on_imported
@@ -33,11 +33,19 @@ class ImportTab(tb.Frame):
         self._build()
 
     def _build(self):
-        page_header(self, "📥", "Import Books",
+        # Everything lives inside a scrollable canvas -- this tab's content
+        # (especially the column-mapping list) can get taller than the
+        # window, particularly at the app's minimum size or on a small
+        # laptop screen, and without this the Import button itself could
+        # end up pushed below the visible area with no way to reach it.
+        canvas, inner = make_scrollable(self)
+        inner.configure(padding=24)
+
+        page_header(inner, "📥", "Import Books",
                     "Works with exports from spreadsheets, other catalog systems, or a "
                     "hand-typed CSV. Column names are auto-detected where possible.")
 
-        file_card = Card(self, title="1. Choose a File", icon="📄")
+        file_card = Card(inner, title="1. Choose a File", icon="📄")
         file_card.pack(fill="x", pady=(0, 14))
         file_row = file_card.body
         tb.Button(file_row, text="Choose CSV File...", command=self._choose_file,
@@ -45,13 +53,13 @@ class ImportTab(tb.Frame):
         self.file_label = tb.Label(file_row, text="No file selected.", foreground="#868e96")
         self.file_label.pack(side="left", padx=12)
 
-        self.mapping_card = Card(self, title="2. Column Mapping", icon="🔗")
+        self.mapping_card = Card(inner, title="2. Column Mapping", icon="🔗")
         self.mapping_card.pack(fill="x", pady=(0, 14))
         self.mapping_frame = self.mapping_card.body
         tb.Label(self.mapping_frame, text="Select a CSV file to configure column mapping.",
                  foreground="#868e96").pack(anchor="w")
 
-        preview_card = Card(self, title="3. Preview (first rows)", icon="👁️")
+        preview_card = Card(inner, title="3. Preview (first rows)", icon="👁️")
         preview_card.pack(fill="both", expand=True, pady=(0, 14))
         preview_frame = preview_card.body
         self.preview_tree = tb.Treeview(preview_frame, show="headings", height=6)
@@ -64,7 +72,7 @@ class ImportTab(tb.Frame):
         preview_frame.grid_rowconfigure(0, weight=1)
         preview_frame.grid_columnconfigure(0, weight=1)
 
-        bottom = tb.Frame(self)
+        bottom = tb.Frame(inner)
         bottom.pack(fill="x")
         self.import_btn = tb.Button(bottom, text="Import Books", command=self._do_import,
                                       bootstyle="success", state="disabled")

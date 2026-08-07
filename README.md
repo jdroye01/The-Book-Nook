@@ -25,6 +25,12 @@ below to install it directly into Applications with its own Dock icon.
   copy even while others of the same book are still checked out), and a
   "can't scan? search by title/author" fallback for books that don't have
   a printed label yet.
+- **Patron name autocomplete** — start typing a name at checkout and
+  matching existing patrons appear in a dropdown; pick one (or just type
+  their full name and tab away) and their saved contact info fills in
+  automatically. A dedicated **Patrons** section lists everyone, lets you
+  add/edit/delete people directly, and bulk-imports a patron list from CSV
+  (Name + Email) the same forgiving way books import.
 - **Edit a loan's contact info anytime** — add or correct a patron's email
   or phone number after checkout, right from the Check In/Out tab, without
   needing to re-do the checkout.
@@ -89,10 +95,11 @@ python3 main.py
 (On Windows: `python main.py`.)
 
 A window opens with a left-hand sidebar for navigation — Dashboard, Check
-In/Out, Catalog, Import Books, Barcodes, and Reminders. The library's data
-is stored locally in `data/library.db` (created automatically on first
-run) — back this file up periodically (just copy it) since it's your
-entire catalog and checkout history.
+In/Out, Catalog, Patrons, Import Books, Barcodes, and Reminders. The
+library's data is stored automatically in the standard per-user app data
+location for your OS (e.g. `~/Library/Application Support/The Book Nook/`
+on macOS) — back up that folder periodically, since it's your entire
+catalog, patron list, and checkout history.
 
 ## Try it with sample data
 
@@ -123,6 +130,24 @@ Checked Out" table at the bottom of the tab and click **Check In Selected**
 in the "Currently Checked Out" table (or scan the book) and click
 **Edit Contact Info...** This is the easiest way to add an email address
 after the fact so due-date reminders can start reaching that patron.
+
+**Patron autocomplete at checkout:** start typing in the Patron Name
+field and matching existing patrons appear in a dropdown below it —
+click one (or press Down then Enter) to fill in their name and their
+saved contact info together. Typing someone's full name exactly and
+tabbing to the next field works the same way, even without using the
+dropdown. First-time patrons just get added automatically when you check
+out to them, same as before.
+
+**Managing patrons directly:** the **Patrons** tab lists everyone who's
+ever been added (by checkout or otherwise), searchable, with Add/Edit/
+Delete. **Import Patrons from CSV** bulk-adds a patron list the same
+forgiving way book import works — map your Name/Email columns and go.
+Existing patrons (matched by exact name) get their contact info updated
+rather than duplicated, so re-importing an updated list is safe to do
+repeatedly. If two existing patrons already share the exact same name,
+that row is skipped rather than guessing which one you meant — you'll see
+it called out after the import finishes.
 
 **Printing barcode labels:** Barcodes tab → "Label Sheet PDF — All Books"
 saves a PDF laid out for standard adhesive label sheets, ready to print
@@ -363,12 +388,13 @@ the_book_nook/
 ├── packaging/
 │   └── setup_py2app.py     Optional: build a standalone .app (advanced, macOS only)
 ├── app/
-│   ├── config.py           All tunable settings
-│   ├── settings.py         User-editable settings (SMTP, reminder schedule) - saved to data/settings.json
+│   ├── config.py           All tunable settings, incl. the per-user data location
+│   ├── settings.py         User-editable settings (SMTP, reminder schedule) - saved as settings.json
 │   ├── database.py         SQLite schema + all data operations
 │   ├── barcodes.py         Barcode image + label sheet PDF generation
 │   ├── label_template.py   Avery template parsing (.docx/.pdf) + built-in presets
-│   ├── importer.py         CSV import logic
+│   ├── importer.py         Book CSV import logic
+│   ├── patron_importer.py  Patron CSV import logic (Name + Email)
 │   ├── email_utils.py      SMTP sending + reminder email templates
 │   ├── reminder_engine.py  Figures out which checkouts need a reminder and sends them
 │   └── gui/
@@ -376,13 +402,15 @@ the_book_nook/
 │       ├── dashboard_tab.py
 │       ├── checkout_tab.py
 │       ├── catalog_tab.py
+│       ├── patrons_tab.py
 │       ├── import_tab.py
 │       ├── barcode_tab.py
 │       ├── reminders_tab.py
 │       └── widgets.py       Shared small GUI components
 ├── sample_data/
 │   └── sample_books.csv    Example data for trying the app
-├── data/                   library.db and settings.json live here (created on first run)
+├── data/                   Legacy location -- if present, copied automatically
+│                           into the new per-user location on first run
 └── exports/                 scratch folder used during PDF export
 ```
 

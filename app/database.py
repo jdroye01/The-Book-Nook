@@ -254,6 +254,107 @@ class LibraryDB:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    def patrons_matching_name_prefix(self, prefix, limit=8):
+        """Used for the checkout form's name autocomplete -- patrons whose
+        name starts with what's been typed so far, best match first."""
+        prefix = prefix.strip()
+        if not prefix:
+            return []
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM patrons WHERE name LIKE ? ORDER BY name LIMIT ?",
+                (f"{prefix}%", limit),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def find_patron_by_exact_name(self, name):
+        """Returns (patron_dict_or_None, is_ambiguous). is_ambiguous is True
+        if more than one patron shares this exact name (case-insensitive) --
+        callers should treat that as "needs a human to sort out" rather
+        than silently picking one."""
+        name = name.strip()
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM patrons WHERE name = ? COLLATE NOCASE", (name,)
+            ).fetchall()
+        if len(rows) == 1:
+            return dict(rows[0]), False
+        if len(rows) > 1:
+            return None, True
+        return None, False
+
+    def all_patrons(self):
+        with self._conn() as conn:
+            rows = conn.execute("SELECT * FROM patrons ORDER BY name").fetchall()
+        return [dict(r) for r in rows]
+
+    def get_patron(self, patron_id):
+        with self._conn() as conn:
+            row = conn.execute("SELECT * FROM patrons WHERE id = ?", (patron_id,)).fetchone()
+        return dict(row) if row else None
+
+    def add_patron(self, name, contact=""):
+        name = name.strip()
+        contact = contact.strip()
+        if not name:
+            raise ValueError("Patron name is required.")
+        with self._conn() as conn:
+            cur = conn.execute(
+                "INSERT INTO patrons (name, contact, date_added) VALUES (?, ?, ?)",
+                (name, contact, now_str()),
+            )
+            return cur.lastrowid
+
+    def update_patron(self, patron_id, name=None, contact=None):
+        sets, values = [], []
+        if name is not None:
+            sets.append("name = ?")
+            values.append(name.strip())
+        if contact is not None:
+            sets.append("contact = ?")
+            values.append(contact.strip())
+        if not sets:
+            return
+        values.append(patron_id)
+        with self._conn() as conn:
+            conn.execute(f"UPDATE patrons SET {', '.join(sets)} WHERE id = ?", values)
+
+    def delete_patron(self, patron_id):
+        with self._conn() as conn:
+            active = conn.execute(
+                "SELECT COUNT(*) c FROM transactions WHERE patron_id=? AND status='checked_out'",
+                (patron_id,),
+            ).fetchone()["c"]
+            if active:
+                raise ValueError("Cannot delete a patron with a book currently checked out.")
+            conn.execute("UPDATE transactions SET patron_id = NULL WHERE patron_id = ?", (patron_id,))
+            conn.execute("DELETE FROM patrons WHERE id = ?", (patron_id,))
+
+    def import_or_update_patron(self, name, contact=""):
+        """
+        Used by the patron CSV importer: finds an existing patron by exact
+        (case-insensitive) name and updates their contact if a new one was
+        given, rather than creating a duplicate row for the same person.
+        Returns a status string: "created", "updated", "unchanged", or
+        "skipped_ambiguous" (more than one existing patron shares this name
+        -- left alone rather than guessing which one to update).
+        """
+        name = name.strip()
+        contact = contact.strip()
+        if not name:
+            raise ValueError("Patron name is required.")
+
+        existing, ambiguous = self.find_patron_by_exact_name(name)
+        if ambiguous:
+            return "skipped_ambiguous"
+        if existing:
+            if contact and contact != (existing.get("contact") or ""):
+                self.update_patron(existing["id"], contact=contact)
+                return "updated"
+            return "unchanged"
+        self.add_patron(name, contact)
+        return "created"
+
     def patron_history(self, patron_id):
         with self._conn() as conn:
             rows = conn.execute(
@@ -263,6 +364,14 @@ class LibraryDB:
                 (patron_id,),
             ).fetchall()
         return [dict(r) for r in rows]
+
+    def patron_active_checkout_count(self, patron_id):
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) c FROM transactions WHERE patron_id=? AND status='checked_out'",
+                (patron_id,),
+            ).fetchone()
+        return row["c"]
 
     # ------------------------------------------------------------------
     # Checkout / check-in

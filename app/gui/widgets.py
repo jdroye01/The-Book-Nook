@@ -241,6 +241,122 @@ class MiniBarChart(tk.Frame):
             tb.Label(row, text=self.value_fmt(value), font=("Helvetica", 9, "bold"), width=4).pack(side="left")
 
 
+class NameAutocomplete(tb.Frame):
+    """
+    A text entry with a live suggestion dropdown fed by lookup_fn(text) ->
+    list of dicts (each needs at least a "name" key; "contact" is shown
+    alongside if present). Picking a suggestion (click, or Enter/Down then
+    Enter) fills the entry and calls on_select(item) so the caller can
+    auto-fill related fields -- e.g. the checkout form fills in a patron's
+    saved email once their name is chosen.
+
+    Deliberately an inline dropdown (pushes following widgets down) rather
+    than a floating popup window -- far more robust across platforms than
+    a positioned overrideredirect Toplevel, at the minor cost of nudging
+    layout when suggestions appear.
+    """
+
+    def __init__(self, parent, lookup_fn, on_select=None, width=30, **entry_kwargs):
+        super().__init__(parent)
+        self.lookup_fn = lookup_fn
+        self.on_select = on_select
+        self._suggestions = []
+        self._suppress_next = False
+
+        self.var = tk.StringVar()
+        self.entry = tb.Entry(self, textvariable=self.var, width=width, **entry_kwargs)
+        self.entry.pack(fill="x")
+
+        self.listbox = tk.Listbox(self, height=0, activestyle="none", font=("Helvetica", 9),
+                                   highlightthickness=1, highlightbackground=CARD_BORDER,
+                                   selectbackground="#d0ebff", selectforeground="#1864ab",
+                                   exportselection=False)
+        # Not packed yet -- shown/hidden on demand as suggestions come and go.
+
+        self.var.trace_add("write", self._on_type)
+        self.entry.bind("<Down>", self._move_to_listbox)
+        self.entry.bind("<Escape>", lambda e: self._hide())
+        self.listbox.bind("<<ListboxSelect>>", self._choose_selected)
+        self.listbox.bind("<Return>", self._choose_selected)
+        self.listbox.bind("<Escape>", lambda e: (self._hide(), self.entry.focus_set()))
+        self.entry.bind("<FocusOut>", self._on_focus_out)
+        self.listbox.bind("<FocusOut>", self._on_focus_out)
+
+    def get(self):
+        return self.var.get()
+
+    def focus_set(self):
+        self.entry.focus_set()
+
+    def bind_return(self, callback):
+        """Fires callback on Enter, but only when no suggestion is showing
+        -- lets the caller use Enter to submit the form without also
+        fighting the dropdown's own use of Enter to pick a suggestion."""
+        self.entry.bind("<Return>", lambda e: callback() if not self.listbox.winfo_ismapped() else None)
+
+    def set_quiet(self, value):
+        """Sets the text without triggering a fresh lookup -- used when
+        the widget itself is filling the field in (e.g. after a pick)."""
+        self._suppress_next = True
+        self.var.set(value)
+
+    def _on_type(self, *_args):
+        if self._suppress_next:
+            self._suppress_next = False
+            self._hide()
+            return
+        text = self.var.get().strip()
+        if not text:
+            self._hide()
+            return
+        self._suggestions = self.lookup_fn(text)
+        if not self._suggestions:
+            self._hide()
+            return
+        self._show()
+
+    def _show(self):
+        self.listbox.delete(0, "end")
+        for p in self._suggestions:
+            label = p["name"]
+            if p.get("contact"):
+                label += f"   —   {p['contact']}"
+            self.listbox.insert("end", label)
+        self.listbox.configure(height=min(5, len(self._suggestions)))
+        if not self.listbox.winfo_ismapped():
+            self.listbox.pack(fill="x", pady=(2, 0))
+
+    def _hide(self):
+        if self.listbox.winfo_ismapped():
+            self.listbox.pack_forget()
+
+    def _move_to_listbox(self, event):
+        if self.listbox.winfo_ismapped():
+            self.listbox.focus_set()
+            self.listbox.selection_set(0)
+            self.listbox.activate(0)
+
+    def _choose_selected(self, event=None):
+        sel = self.listbox.curselection()
+        if not sel:
+            return
+        patron = self._suggestions[sel[0]]
+        self.set_quiet(patron["name"])
+        self._hide()
+        self.entry.focus_set()
+        self.entry.icursor("end")
+        if self.on_select:
+            self.on_select(patron)
+
+    def _on_focus_out(self, event):
+        self.after(150, self._maybe_hide)
+
+    def _maybe_hide(self):
+        focused = self.focus_get()
+        if focused not in (self.entry, self.listbox):
+            self._hide()
+
+
 BOOK_COLUMNS = [
     ("title", "Title", 240),
     ("author", "Author", 160),
@@ -418,7 +534,18 @@ def labeled_entry(parent, label_text, row, col=0, width=28, show=None, colspan=1
 
 
 def make_scrollable(parent):
-    """Returns (outer_frame, inner_frame) where inner_frame scrolls vertically."""
+    """
+    Returns (canvas, inner) where inner is a frame that scrolls vertically
+    -- build your page's content into inner instead of parent directly.
+    Mouse-wheel scrolling (and macOS trackpad two-finger scroll, which
+    generates the same MouseWheel event) is wired up automatically while
+    the pointer is over this canvas.
+
+    Use this for any page whose content could plausibly get taller than
+    the window -- a fixed-height card layout has no way to reach content
+    below the visible area otherwise, which can make things like a save
+    button effectively disappear on a smaller screen or a resized window.
+    """
     canvas = tk.Canvas(parent, highlightthickness=0)
     vsb = tb.Scrollbar(parent, orient="vertical", command=canvas.yview)
     inner = tb.Frame(canvas)
@@ -431,4 +558,22 @@ def make_scrollable(parent):
     vsb.grid(row=0, column=1, sticky="ns")
     parent.grid_rowconfigure(0, weight=1)
     parent.grid_columnconfigure(0, weight=1)
+
+    def _on_mousewheel(event):
+        delta = -1 * (event.delta // 120) if event.delta else (-1 if event.num == 4 else 1)
+        canvas.yview_scroll(delta, "units")
+
+    def _bind_wheel(event):
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        canvas.bind_all("<Button-4>", _on_mousewheel)
+        canvas.bind_all("<Button-5>", _on_mousewheel)
+
+    def _unbind_wheel(event):
+        canvas.unbind_all("<MouseWheel>")
+        canvas.unbind_all("<Button-4>")
+        canvas.unbind_all("<Button-5>")
+
+    canvas.bind("<Enter>", _bind_wheel)
+    canvas.bind("<Leave>", _unbind_wheel)
+
     return canvas, inner
