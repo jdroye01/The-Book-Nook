@@ -89,6 +89,12 @@ class MainWindow(tb.Window):
         for key, icon, label in NAV_ITEMS:
             self.sidebar.add_item(key, icon, label)
 
+        if not config.USING_SHARED_STORAGE:
+            self.after(500, lambda: self.status_bar.show(
+                "Couldn't set up shared storage on this computer -- using a personal copy "
+                "instead of one shared with other logins. See Help > About for details.",
+                "error", ms=15000))
+
         self.after(STARTUP_CHECK_DELAY_MS, self._schedule_auto_reminder_checks)
 
     def _set_app_icon(self):
@@ -121,6 +127,21 @@ class MainWindow(tb.Window):
         self.config(menu=menubar)
 
     def _show_about(self):
+        if config.USING_SHARED_STORAGE:
+            storage_note = (
+                f"Shared library data: everyone who logs into this computer sees the "
+                f"same catalog and checkouts.\nStored at: {config.DATA_ROOT}"
+            )
+        else:
+            storage_note = (
+                "⚠ Couldn't set up shared storage on this computer, so this account has "
+                "its own private copy of the catalog instead of sharing one with other "
+                "logins.\n"
+                f"Personal copy stored at: {config.DATA_ROOT}\n\n"
+                "To fix this so every login shares the same library: an administrator "
+                "needs to grant write access to the shared folder shown in the "
+                "README's 'Shared use on one computer' section, then restart the app."
+            )
         messagebox.showinfo(
             "About",
             f"{config.APP_TITLE}\n\n"
@@ -128,7 +149,8 @@ class MainWindow(tb.Window):
             "Search the catalog, check books in/out, bulk-import from CSV, "
             "generate/print barcode labels, and send due-date email reminders.\n\n"
             "Ready for a barcode scanner (acts as a keyboard - no setup needed) "
-            "and a dedicated barcode label printer whenever you get one."
+            "and a dedicated barcode label printer whenever you get one.\n\n"
+            f"{storage_note}"
         )
 
     # ------------------------------------------------------------------

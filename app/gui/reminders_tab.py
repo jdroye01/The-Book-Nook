@@ -153,8 +153,8 @@ class RemindersTab(tb.Frame):
 
         body = tb.Frame(inner)
         body.pack(fill="x", pady=(0, 14))
-        body.grid_columnconfigure(0, weight=1)
-        body.grid_columnconfigure(1, weight=1)
+        body.grid_columnconfigure(0, weight=1, minsize=320)
+        body.grid_columnconfigure(1, weight=1, minsize=320)
 
         # --- Left: SMTP settings ---
         smtp_card = Card(body, title="Outgoing Email (SMTP) Settings", icon="📧")
@@ -203,10 +203,17 @@ class RemindersTab(tb.Frame):
         tb.Checkbutton(sched_box, text="Automatically send reminders while the app is open",
                         variable=self.enabled_var, bootstyle="round-toggle").pack(anchor="w", pady=(0, 12))
 
-        tb.Label(sched_box, text="Send at these points relative to the due date:").pack(anchor="w")
-        tb.Label(sched_box, text="(e.g. -3, 0, 3, 7  =  3 days before, on the day, "
+        label1 = tb.Label(sched_box, text="Send at these points relative to the due date:",
+                          justify="left")
+        label1.pack(anchor="w", fill="x")
+        label2 = tb.Label(sched_box, text="(e.g. -3, 0, 3, 7  =  3 days before, on the day, "
                                   "3 days after, 7 days after)",
-                  font=("Helvetica", 8), foreground="#868e96").pack(anchor="w", pady=(0, 6))
+                  font=("Helvetica", 8), foreground="#868e96", justify="left")
+        label2.pack(anchor="w", fill="x", pady=(0, 6))
+        sched_box.bind("<Configure>", lambda e: (
+            label1.configure(wraplength=max(180, e.width - 4)),
+            label2.configure(wraplength=max(180, e.width - 4)),
+        ))
         self.offsets_var = tk.StringVar(
             value=", ".join(str(o) for o in s.get("reminder_offsets", [-3, 0, 3, 7])))
         tb.Entry(sched_box, textvariable=self.offsets_var, width=30).pack(anchor="w", fill="x")

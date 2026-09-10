@@ -61,8 +61,13 @@ def page_header(parent, icon, title, subtitle=None):
     row.pack(anchor="w", fill="x")
     tb.Label(row, text=f"{icon}  {title}", font=("Helvetica", 18, "bold")).pack(side="left")
     if subtitle:
-        tb.Label(header, text=subtitle, font=("Helvetica", 10), foreground=MUTED_TEXT).pack(
-            anchor="w", pady=(2, 0))
+        subtitle_label = tb.Label(header, text=subtitle, font=("Helvetica", 10),
+                                   foreground=MUTED_TEXT, justify="left")
+        subtitle_label.pack(anchor="w", fill="x", pady=(2, 0))
+        # Wraplength tracks the header's actual current width rather than a
+        # fixed guess -- without this, long descriptions rendered as one
+        # unbroken line well past the visible window instead of wrapping.
+        header.bind("<Configure>", lambda e: subtitle_label.configure(wraplength=max(200, e.width - 4)))
     return row
 
 
@@ -161,7 +166,7 @@ class Sidebar(tk.Frame):
     when a nav item is clicked).
     """
 
-    def __init__(self, parent, title, subtitle, on_select, width=220):
+    def __init__(self, parent, title, subtitle, on_select, width=240):
         super().__init__(parent, bg=SIDEBAR_BG, width=width)
         self.pack_propagate(False)
         self.on_select = on_select
@@ -170,11 +175,18 @@ class Sidebar(tk.Frame):
 
         header = tk.Frame(self, bg=SIDEBAR_BG)
         header.pack(fill="x", pady=(22, 18), padx=18)
+        # wraplength is a safety net, not just a fit for this exact string --
+        # different OSes measure the same text at slightly different pixel
+        # widths, so this lets the title/subtitle wrap to a second line
+        # instead of silently clipping if it ever runs a little long.
+        available = width - 2 * 18
         tk.Label(header, text=title, font=("Helvetica", 15, "bold"),
-                 bg=SIDEBAR_BG, fg=SIDEBAR_TEXT_ACTIVE, anchor="w").pack(fill="x")
+                 bg=SIDEBAR_BG, fg=SIDEBAR_TEXT_ACTIVE, anchor="w",
+                 wraplength=available, justify="left").pack(fill="x")
         if subtitle:
             tk.Label(header, text=subtitle, font=("Helvetica", 9),
-                     bg=SIDEBAR_BG, fg=SIDEBAR_SUBTLE, anchor="w").pack(fill="x", pady=(2, 0))
+                     bg=SIDEBAR_BG, fg=SIDEBAR_SUBTLE, anchor="w",
+                     wraplength=available, justify="left").pack(fill="x", pady=(2, 0))
 
         self.items_frame = tk.Frame(self, bg=SIDEBAR_BG)
         self.items_frame.pack(fill="x")
@@ -551,8 +563,16 @@ def make_scrollable(parent):
     inner = tb.Frame(canvas)
 
     inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-    canvas.create_window((0, 0), window=inner, anchor="nw")
+    window_id = canvas.create_window((0, 0), window=inner, anchor="nw")
     canvas.configure(yscrollcommand=vsb.set)
+
+    # Without this, `inner` sits at whatever width its own content naturally
+    # needs and never grows -- so maximizing/resizing the window makes the
+    # canvas bigger but leaves the actual content (and everything packed
+    # with fill="x" inside it) stuck at its original size, with empty space
+    # to the right. Keeping the window item's width in sync with the
+    # canvas's own width is what makes the page actually feel responsive.
+    canvas.bind("<Configure>", lambda e: canvas.itemconfig(window_id, width=e.width))
 
     canvas.grid(row=0, column=0, sticky="nsew")
     vsb.grid(row=0, column=1, sticky="ns")

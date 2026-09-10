@@ -66,7 +66,7 @@ class DashboardTab(tb.Frame):
         search_frame.pack(side="right")
         tb.Label(search_frame, text="Quick search:", font=("Helvetica", 9)).pack(side="left", padx=(0, 6))
         self.search_var = tk.StringVar()
-        entry = tb.Entry(search_frame, textvariable=self.search_var, width=22)
+        entry = tb.Entry(search_frame, textvariable=self.search_var, width=16)
         entry.pack(side="left")
         entry.bind("<Return>", self._do_quick_search)
         tb.Button(search_frame, text="Go", bootstyle="secondary-outline",
