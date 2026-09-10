@@ -204,7 +204,7 @@ class BarcodeTab(tb.Frame):
         body = tb.Frame(self)
         body.pack(fill="both", expand=True)
         body.grid_columnconfigure(0, weight=2)
-        body.grid_columnconfigure(1, weight=1)
+        body.grid_columnconfigure(1, weight=1, minsize=300)
         body.grid_rowconfigure(0, weight=1)
 
         left_card = Card(body, title="Books", icon="📚")
@@ -226,11 +226,20 @@ class BarcodeTab(tb.Frame):
         right = right_card.body
 
         self.preview_label = tb.Label(right, text="Select a book to preview its barcode.",
-                                       foreground="#868e96")
+                                       foreground="#868e96", justify="left")
         self.preview_label.pack(pady=(0, 10))
 
         self.info_label = tb.Label(right, text="", justify="left")
-        self.info_label.pack(anchor="w", pady=(0, 10))
+        self.info_label.pack(anchor="w", fill="x", pady=(0, 10))
+
+        # Both labels' text length varies a lot (a short placeholder vs. a
+        # book's full title/author/barcode) and this column is the
+        # narrower of the two -- wrap both to the card's actual current
+        # width so neither ever renders as one unbroken line past the edge.
+        right.bind("<Configure>", lambda e: (
+            self.preview_label.configure(wraplength=max(140, e.width - 10)),
+            self.info_label.configure(wraplength=max(140, e.width - 10)),
+        ))
 
         tb.Button(right, text="Save This Barcode as PNG", command=self._save_single,
                    bootstyle="secondary-outline").pack(fill="x", pady=2)

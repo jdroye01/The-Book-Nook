@@ -16,6 +16,10 @@ below to install it directly into Applications with its own Dock icon.
 
 ## Features
 
+- **Shared library data on one computer** — everyone who logs in (any
+  Windows or macOS account) sees the same catalog and checkouts, with an
+  automatic personal fallback (and a clear warning) if a computer's
+  permissions won't allow shared storage.
 - **Search** the catalog by title, author, genre, or barcode/ISBN — one search
   box, instant results. **True multi-column sorting** — click a column to
   sort by it, Shift+click another to add it as the next sort level (e.g.
@@ -96,10 +100,61 @@ python3 main.py
 
 A window opens with a left-hand sidebar for navigation — Dashboard, Check
 In/Out, Catalog, Patrons, Import Books, Barcodes, and Reminders. The
-library's data is stored automatically in the standard per-user app data
-location for your OS (e.g. `~/Library/Application Support/The Book Nook/`
-on macOS) — back up that folder periodically, since it's your entire
-catalog, patron list, and checkout history.
+library's data is stored in a shared location on this computer (see
+"Shared use on one computer" below) so everyone who logs in sees the same
+catalog and checkouts — back up that folder periodically, since it's your
+entire catalog, patron list, and checkout history.
+
+## Shared use on one computer — everyone sees the same library
+
+If a few staff members share one computer (or take turns on it across
+different days) and each has their own Windows or macOS login, this app
+is built so they all see the **same** catalog and checkouts rather than
+each login getting its own empty library. It does this by storing data in
+a machine-wide, all-users location instead of a personal one:
+
+- **macOS:** `/Library/Application Support/The Book Nook/`
+- **Windows:** `%ProgramData%\The Book Nook\` (usually `C:\ProgramData\The Book Nook\`)
+- **Linux:** `/var/lib/The Book Nook/`
+
+This should just work out of the box on most computers — the app creates
+that folder itself the first time it runs, and every login after that
+reads and writes the same one. **Help → About** always shows exactly
+where your data is stored and whether it's currently shared.
+
+**If a computer's permissions won't allow that** (some locked-down or
+managed setups restrict who can create folders in these locations), the
+app automatically falls back to a personal, per-login copy instead of
+failing to start — you'll see a warning in the status bar and in
+**Help → About** explaining this happened. To fix it so logins share data
+again:
+
+- **macOS:** an administrator can run this once in Terminal, then any
+  login can use the app normally:
+  ```
+  sudo mkdir -p "/Library/Application Support/The Book Nook"
+  sudo chmod -R 777 "/Library/Application Support/The Book Nook"
+  ```
+- **Windows:** right-click **`C:\ProgramData`** → Properties → Security →
+  Edit, and give the **Users** group Modify permission (this is usually
+  already the case on a normal home/standalone PC — this typically only
+  comes up on a managed or domain-joined computer). Alternatively, an
+  administrator can launch the app once (right-click → Run as
+  administrator) to create the folder, after which normal logins can use
+  it.
+
+**Upgrading from an older version of this app:** earlier versions stored
+data per-login rather than shared. The very first time the updated app
+runs, it automatically copies that login's existing catalog into the new
+shared location — so whoever launches the update first keeps their data
+with nothing to do manually. If more than one person on this computer
+already had their *own* separate catalog from before (each with their own
+books added under the old per-login setup), only the first person to
+launch the updated version gets auto-migrated; the others' old data stays
+right where it was (their old per-login folder, shown by **Help → About**
+before the update) rather than being silently merged or discarded. If
+that applies to you, decide which catalog should "win," or manually
+combine the CSV exports of each into one before re-importing.
 
 ## Try it with sample data
 
@@ -259,6 +314,10 @@ get the layout right, in order of how much they do for you:
      will say plainly that it couldn't detect a layout rather than
      silently guessing wrong. If that happens, try the `.docx` version of
      the same template (Avery usually offers both) or use a preset instead.
+     (This is also the only part of the whole app that depends on
+     PyMuPDF — if that package has trouble installing on your system,
+     everything else, including `.docx` templates and presets, is
+     completely unaffected.)
 3. **Type the numbers in by hand** — always available in the same dialog,
    and also where you land after a preset or upload so you can fine-tune
    anything before saving.
@@ -416,6 +475,23 @@ the_book_nook/
 
 ## Troubleshooting
 
+- **Coworkers on the same computer don't see my checkouts/books** — see
+  "Shared use on one computer" above. Check **Help → About** on each
+  login to confirm whether it's using shared storage or fell back to a
+  personal copy, and where that data actually lives.
+- **App won't start at all — `ImportError: DLL load failed while importing
+  _extra`** (Windows, usually with a very new Python version like 3.14) —
+  this comes from PyMuPDF, the library only used for reading *PDF* Avery
+  templates, and it no longer stops the app from starting: importing it is
+  deferred until you actually try to upload a PDF template, so a broken
+  install of that one optional package can't take down anything else.
+  If you're seeing this on a version of the app from before this fix,
+  update to the latest copy. To actually fix PDF template reading itself
+  (optional — presets and `.docx` templates don't need it at all):
+  try an older, more established Python version (3.11–3.13) where PyMuPDF
+  has stable prebuilt wheels, or install the
+  [Microsoft Visual C++ Redistributable (x64)](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)
+  which this kind of compiled-package DLL error often traces back to.
 - **`The Book Nook.app` shows an alert and won't open** — the alert tells
   you exactly what's wrong (usually: Python isn't installed, or is missing
   tkinter). Install Python from python.org and try again. For anything

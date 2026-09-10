@@ -94,6 +94,7 @@ class LibraryDB:
     def _init_schema(self):
         with self._conn() as conn:
             conn.executescript(SCHEMA)
+        config.widen_shared_permissions()
 
     # ------------------------------------------------------------------
     # Barcode helpers

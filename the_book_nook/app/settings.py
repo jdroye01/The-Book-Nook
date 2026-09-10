@@ -60,6 +60,7 @@ class Settings:
         os.makedirs(config.DATA_DIR, exist_ok=True)
         with open(SETTINGS_PATH, "w", encoding="utf-8") as f:
             json.dump(self._data, f, indent=2)
+        config.widen_shared_permissions()
 
     def get(self, key, default=None):
         return self._data.get(key, default)

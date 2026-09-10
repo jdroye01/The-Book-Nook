@@ -19,9 +19,6 @@ Two sources, in order of reliability:
    rather than guessing -- silently getting label positions wrong wastes
    physical label sheets, which is worse than just telling the user.
 """
-import docx
-import fitz  # PyMuPDF
-
 EMU_PER_INCH = 914400
 PT_PER_INCH = 72.0
 
@@ -86,6 +83,15 @@ def parse_docx_template(path):
     label template (Avery's own templates are built as a table -- one
     cell per label). Returns a LABEL_SHEET-shaped dict.
     """
+    try:
+        import docx
+    except ImportError as e:
+        raise TemplateParseError(
+            "The python-docx package isn't available, so .docx templates can't "
+            f"be read right now ({e}). Try a preset or manual entry instead, or "
+            "run: pip install python-docx"
+        )
+
     try:
         document = docx.Document(path)
     except Exception as e:
@@ -170,6 +176,18 @@ def parse_pdf_template(path):
     with a clear explanation if no confident grid can be found -- callers
     should fall back to a preset or manual entry rather than trust a guess.
     """
+    try:
+        import fitz  # PyMuPDF
+    except ImportError as e:
+        raise TemplateParseError(
+            "PDF template reading isn't available on this computer right now "
+            f"({e}) -- this is usually a PyMuPDF/Python version mismatch, "
+            "especially on very new Python releases. Try the .docx version of "
+            "this template if Avery offers one, pick your product from the "
+            "preset list, or enter the label dimensions manually -- none of "
+            "those need this dependency at all."
+        )
+
     try:
         doc = fitz.open(path)
     except Exception as e:
